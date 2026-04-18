@@ -7,7 +7,6 @@ dependency. In dev mode (no OAUTH_CLIENT_ID), auth is bypassed automatically.
 import asyncio
 import json
 import logging
-import os
 from typing import Any
 
 from dependencies import get_current_user
@@ -31,6 +30,7 @@ from models import (
 from session_manager import MAX_SESSIONS, SessionCapacityError, session_manager
 
 from agent.core.agent_loop import _resolve_hf_router_params
+from agent.utils.hf_auth import get_hf_token
 
 logger = logging.getLogger(__name__)
 
@@ -207,7 +207,7 @@ async def create_session(
 
     Returns 503 if the server or user has reached the session limit.
     """
-    # Extract the user's HF token (Bearer header, HttpOnly cookie, or env var)
+    # Extract request token first, then fall back to local HF auth.
     hf_token = None
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
@@ -215,7 +215,7 @@ async def create_session(
     if not hf_token:
         hf_token = request.cookies.get("hf_access_token")
     if not hf_token:
-        hf_token = os.environ.get("HF_TOKEN")
+        hf_token = get_hf_token()
 
     try:
         session_id = await session_manager.create_session(
